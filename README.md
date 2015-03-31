@@ -1,6 +1,7 @@
 # PS2PlayerData
 __WIP__ package to easily and quickly get data from the Planetside 2 [API](http://census.daybreakgames.com/) into Meteor
 
+Feedback is very welcome
 
 ## Usage
 Not ready at all and still unpublished, but since you're here:
