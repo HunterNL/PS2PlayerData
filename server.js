@@ -32,8 +32,8 @@ function proccessPlayerList(array) {
 		check(player.character_id,String);
 
 		player.date_update = Date.now(); //Insert time of update (now) into Mongo as well
-		if(player.joined_data) {
-			lodash.assign(player,player.joined_data);
+		if(player.joined_data&&player.joined_data[0]) {
+			lodash.assign(player,player.joined_data[0]);
 			delete player.joined_data;
 		}
 
@@ -62,4 +62,14 @@ PS2Data.fetchOutfitPlayers = function(outfitId) {
 	var data = HTTP.get(url).data;
 	proccessPlayerList(data.outfit_member_list);
 
+};
+
+PS2Data.configure = function(obj) {
+	if(obj.service_id) {
+		SERVICE_ID = obj.service_id;
+	}
+
+	if(obj.data_limit) {
+		DATA_LIMIT = obj.data_limit;
+	}
 };
