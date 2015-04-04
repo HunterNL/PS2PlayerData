@@ -1,11 +1,11 @@
 PS2Data = {};
 PS2Data.live = {};
-PS2Data.Players = new Mongo.Collection("ps2_players");
-PS2Data.Oufits = new Mongo.Collection("ps2_outfits");
+
 
 var API_ENTRY = "http://census.daybreakgames.com";
 var SERVICE_ID = "example"; //Default ID, limited to 10 queries/minute
 var DATA_LIMIT = 500; //Maximum ammount of items returned from a query
+var MONGO_INITIALIZED = false; //Badly named, mongo can be "initialized" as not being used
 
 function buildUrl(collection,id,query,version,format) {
 	version = version || "v2";
@@ -20,11 +20,18 @@ function buildUrl(collection,id,query,version,format) {
 		"/" + query;
 }
 
-//Takes an array of players, moves joined_data into obj root, adds date, inserts it all into Mongo and returns it for good measure
+//Takes an array of players, moves joined_data into obj root, adds date, 
+//	inserts it all into Mongo if availible and returns it
 function proccessPlayerList(array) {
 	if(!array || array.length === 0) {
 		throw new Meteor.Error("invalid_arguments","Invalid arguments to proccessPlayerList",array);
 	}
+
+	if(!MONGO_INITIALIZED) {
+		mongoInitDefault(); //If we got all the way here and mongo isn't initialized, initialize mongo with default collection names
+	}
+
+	var gotMongo = !!PS2Data.Players;
 
 	var returnArray = [];
 
@@ -40,10 +47,11 @@ function proccessPlayerList(array) {
 			delete player.joined_data;
 		}
 
-
-		PS2Data.Players.upsert(player.character_id,{
-			$set : player
-		});
+		if(gotMongo) {
+			PS2Data.Players.upsert(player.character_id,{
+				$set : player
+			});
+		}
 
 		returnArray.push(player);
 	}
@@ -57,8 +65,8 @@ function proccessPlayerList(array) {
 
 /*
 Returns a function that can be called nicely by HTTP.call with a callback and data_key
-Data_key is the property name of the actual data in the results object,
-its different for every collection AND ammount of objects returned because DBG is silly
+	Data_key is the property name of the actual data in the results object,
+		its different for every collection AND ammount of objects returned because DBG is silly
 */
 function bindCallback(callback,data_key,isList) {
 
@@ -92,6 +100,53 @@ function bindCallback(callback,data_key,isList) {
 	};
 }
 
+//Default way to intialize mongo
+function mongoInitDefault(){
+	if(MONGO_INITIALIZED) {
+		console.warn("PS2Data: default mongo init called while already initialized");
+	}
+	if(Mongo) {
+		PS2Data.Players = new Mongo.Collection("ps2_players");
+		PS2Data.Oufits = new Mongo.Collection("ps2_outfits");
+	}
+
+	MONGO_INITIALIZED = true;
+}
+
+//Custom way to init mongo, setting is config.mongo object passed to PS2Data.configure
+function mongoInitCustom(setting) {
+	if (setting === false) {
+		MONGO_INITIALIZED = true; //No Mongo used, prevent further initialization
+		return;
+	}
+
+	//Default collection names
+	var player_collection_setting = "ps2_players";
+	var outfit_collection_setting = "ps2_outfits";
+
+
+	if(typeof setting.players != "undefined") {
+		player_collection_setting = settings.players;
+	}
+	if(player_collection_setting) {
+		PS2Data.Players = new Mongo.Collection(player_collection_setting);
+	}
+
+
+	if(typeof setting.outfits != "undefined") {
+		outfit_collection_setting = settings.outfits;
+	}
+	if(outfit_collection_setting) {
+		PS2Data.Players = new Mongo.Collection(outfit_collection_setting);
+	}
+
+	//--------------------------------------------------------------------------
+
+
+
+
+	MONGO_INITIALIZED = true; //Prevent rerunning;
+}
 
 //Fetches a single player by ID
 PS2Data.fetchSinglePlayer = function(id,callback) {
@@ -115,5 +170,13 @@ PS2Data.configure = function(obj) {
 
 	if(obj.data_limit) {
 		DATA_LIMIT = obj.data_limit;
+	}
+
+	if(typeof obj.mongo != "undefined") {
+		if(!MONGO_INITIALIZED) {
+			mongoInitCustom(obj.mongo);
+		} else {
+			console.warn("PS2Data.configure trying to re-intialize mongo collections");
+		}
 	}
 };
