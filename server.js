@@ -24,8 +24,8 @@ function buildUrl(collection,id,query,version,format) {
 		"/" + query;
 }
 
-
-Parsers.player = function(array) {
+playerHandler = {};
+playerHandler.parser = function(array) {
 	var returnArray = [];
 
 	for(var i=0;i<array.length;i++) {
@@ -46,11 +46,7 @@ Parsers.player = function(array) {
 	return returnArray;
 };
 
-Parsers.outfit = function(array) {
-		//TODO code me!
-};
-
-Inserters.player = function(array) {
+playerHandler.inserter = function(array) {
 	if(PS2Data.Players) {
 		for(var i=0;i<array.length;i++) {
 			var player = array[i];
@@ -62,8 +58,13 @@ Inserters.player = function(array) {
 	}
 };
 
-Inserters.outfit = function(array) {
-	//TODO Code me!
+outfitHandler = {};
+outfitHandler.parser = function(array) {
+
+};
+
+outfitHandler.inserter = function(array) {
+
 };
 
 //37509488620601506 conz id
@@ -93,8 +94,8 @@ function bindCallback(callback,handler,args) {
 			var data = result.data[args.data_key];
 			if(typeof data !== "undefined") {
 
-				var niceData = Parsers[handler](data); //Turn raw data into something easier to work with
-				Inserters[handler](niceData);
+				var niceData = handler.parser(data); //Turn raw data into something easier to work with
+				handler.inserter(niceData);
 
 				if(typeof callback=="function") {
 
@@ -149,7 +150,7 @@ function mongoInitCustom(setting) {
 //Fetches a single player by ID
 PS2Data.fetchSinglePlayer = function(id,callback) {
 	var url = buildUrl("character",id,"?c:resolve=online_status");
-	HTTP.get(url,{},bindCallback(callback,"player",{data_key:"character_list",isList:false}));
+	HTTP.get(url,{},bindCallback(callback,playerHandler,{data_key:"character_list",isList:false}));
 };
 
 //http://census.daybreakgames.com/get/ps2:v2/outfit_member/?outfit_id=37509488620601506&c:join=type:character^on:character_id^to:character_id^list:1^inject_at:cd&c:limit=500
@@ -157,7 +158,7 @@ PS2Data.fetchSinglePlayer = function(id,callback) {
 //Fetches all players from an outfit, takes ID
 PS2Data.fetchOutfitPlayers = function(outfitId,callback,fetchOutFit) {
 	var url = buildUrl("outfit_member",null,"?outfit_id="+outfitId+"&c:join=type:character^on:character_id^to:character_id^list:1^inject_at:joined_data&c:limit="+DATA_LIMIT); //Appending data limit, required for API to function
-	HTTP.get(url,{},bindCallback(callback,"player",{data_key:"outfit_member_list",isList:true}));
+	HTTP.get(url,{},bindCallback(callback,playerHandler,{data_key:"outfit_member_list",isList:true}));
 };
 
 //Basic configuration function
