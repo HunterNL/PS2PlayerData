@@ -6,6 +6,10 @@ var API_ENTRY = "http://census.daybreakgames.com";
 var SERVICE_ID = "example"; //Default ID, limited to 10 queries/minute
 var DATA_LIMIT = 500; //Maximum ammount of items returned from a query
 var MONGO_INITIALIZED = false; //Badly named, mongo can be "initialized" as not being used
+//TODO Actualy weakly depend on mongo/imply mongo? Whatever makes mongo optional
+
+var Inserters = {};
+var Parsers = {} ;
 
 function buildUrl(collection,id,query,version,format) {
 	version = version || "v2";
@@ -20,19 +24,8 @@ function buildUrl(collection,id,query,version,format) {
 		"/" + query;
 }
 
-//Takes an array of players, moves joined_data into obj root, adds date,
-//	inserts it all into Mongo if availible and returns it
-function proccessPlayerList(array) {
-	if(!array || array.length === 0) {
-		throw new Meteor.Error("invalid_arguments","Invalid arguments to proccessPlayerList",array);
-	}
 
-	if(!MONGO_INITIALIZED) {
-		mongoInitDefault(); //If we got all the way here and mongo isn't initialized, initialize mongo with default collection names
-	}
-
-	var gotMongo = !!PS2Data.Players;
-
+Parsers.player = function(array) {
 	var returnArray = [];
 
 	for(var i=0;i<array.length;i++) {
@@ -47,18 +40,32 @@ function proccessPlayerList(array) {
 			delete player.joined_data;
 		}
 
-		if(gotMongo) {
-			PS2Data.Players.upsert(player.character_id,{
-				$set : player
-			});
-		}
-
 		returnArray.push(player);
 	}
 
 	return returnArray;
+};
 
-}
+Parsers.outfit = function(array) {
+		//TODO code me!
+};
+
+Inserters.player = function(array) {
+	if(PS2Data.Players) {
+		for(var i=0;i<array.length;i++) {
+			var player = array[i];
+
+			PS2Data.Players.upsert(player.character_id,{
+				$set : player
+			});
+		}
+	}
+};
+
+Inserters.outfit = function(array) {
+	//TODO Code me!
+};
+
 //37509488620601506 conz id
 
 
@@ -68,18 +75,30 @@ Returns a function that can be called nicely by HTTP.call with a callback and da
 	Data_key is the property name of the actual data in the results object,
 		its different for every collection AND ammount of objects returned because DBG is silly
 */
-function bindCallback(callback,data_key,isList) {
+function bindCallback(callback,handler,args) {
 
 	//The main receiving function
-	function httpCallback(error,result,callback,data_key,isList) {
+	function httpCallback(error,result,callback,handler,args) {
 		//console.log("error:"+error);
+		if(error) {
+			throw new Meteor.Error("PS2Playerdata_http_error","Failed to get data from http connection",error);
+		}
+
 		if(result.data) {
-			if(result.data[data_key]) {
-				var niceData = proccessPlayerList(result.data[data_key]);
+
+			if(!MONGO_INITIALIZED) {
+				mongoInitDefault(); //If we got all the way here and mongo isn't initialized, initialize mongo
+			}
+
+			var data = result.data[args.data_key];
+			if(typeof data !== "undefined") {
+
+				var niceData = Parsers[handler](data); //Turn raw data into something easier to work with
+				Inserters[handler](niceData);
 
 				if(typeof callback=="function") {
 
-					if(isList) {
+					if(args.isList) {
 						callback(niceData);
 					} else {
 						callback(niceData[0]);
@@ -96,7 +115,7 @@ function bindCallback(callback,data_key,isList) {
 
 	//The 3rd argument binding function
 	return function(error,result) {
-		httpCallback(error,result,callback,data_key,isList);
+		httpCallback(error,result,callback,handler,args);
 	};
 }
 
@@ -120,7 +139,9 @@ function mongoInitCustom(setting) {
 		return;
 	}
 
-	//Possible customization here
+	//Possible customization here, maybe, for now just do the same as default
+	PS2Data.Players = new Mongo.Collection("planetside2data_players");
+	PS2Data.Oufits = new Mongo.Collection("planetside2data_outfits");
 
 	MONGO_INITIALIZED = true; //Prevent rerunning;
 }
@@ -128,15 +149,15 @@ function mongoInitCustom(setting) {
 //Fetches a single player by ID
 PS2Data.fetchSinglePlayer = function(id,callback) {
 	var url = buildUrl("character",id,"?c:resolve=online_status");
-	var data = HTTP.get(url,{},bindCallback(callback,"character_list",false));
+	HTTP.get(url,{},bindCallback(callback,"player",{data_key:"character_list",isList:false}));
 };
 
 //http://census.daybreakgames.com/get/ps2:v2/outfit_member/?outfit_id=37509488620601506&c:join=type:character^on:character_id^to:character_id^list:1^inject_at:cd&c:limit=500
 //http://census.daybreakgames.com/get/ps2:v2/outfit_member/?outfit_id=37509488620601506&c:join=type:character^on:character_id^to:character_id^list:1^inject_at:full_data&c:limit="+DATA_LIMIT
 //Fetches all players from an outfit, takes ID
-PS2Data.fetchOutfitPlayers = function(outfitId,callback) {
+PS2Data.fetchOutfitPlayers = function(outfitId,callback,fetchOutFit) {
 	var url = buildUrl("outfit_member",null,"?outfit_id="+outfitId+"&c:join=type:character^on:character_id^to:character_id^list:1^inject_at:joined_data&c:limit="+DATA_LIMIT); //Appending data limit, required for API to function
-	var data = HTTP.get(url,{},bindCallback(callback,"outfit_member_list",true));
+	HTTP.get(url,{},bindCallback(callback,"player",{data_key:"outfit_member_list",isList:true}));
 };
 
 //Basic configuration function
