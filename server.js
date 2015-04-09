@@ -1,7 +1,7 @@
 PS2Data = {};
 PS2Data.live = {};
 
-
+//No touchy!
 var API_ENTRY = "http://census.daybreakgames.com";
 var SERVICE_ID = "example"; //Default ID, limited to 10 queries/minute
 var DATA_LIMIT = 500; //Maximum ammount of items returned from a query
@@ -20,7 +20,7 @@ function buildUrl(collection,id,query,version,format) {
 		"/" + query;
 }
 
-//Takes an array of players, moves joined_data into obj root, adds date, 
+//Takes an array of players, moves joined_data into obj root, adds date,
 //	inserts it all into Mongo if availible and returns it
 function proccessPlayerList(array) {
 	if(!array || array.length === 0) {
@@ -106,8 +106,8 @@ function mongoInitDefault(){
 		console.warn("PS2Data: default mongo init called while already initialized");
 	}
 	if(Mongo) {
-		PS2Data.Players = new Mongo.Collection("ps2_players");
-		PS2Data.Oufits = new Mongo.Collection("ps2_outfits");
+		PS2Data.Players = new Mongo.Collection("planetside2data_players");
+		PS2Data.Oufits = new Mongo.Collection("planetside2data_outfits");
 	}
 
 	MONGO_INITIALIZED = true;
@@ -120,30 +120,7 @@ function mongoInitCustom(setting) {
 		return;
 	}
 
-	//Default collection names
-	var player_collection_setting = "ps2_players";
-	var outfit_collection_setting = "ps2_outfits";
-
-
-	if(typeof setting.players != "undefined") {
-		player_collection_setting = settings.players;
-	}
-	if(player_collection_setting) {
-		PS2Data.Players = new Mongo.Collection(player_collection_setting);
-	}
-
-
-	if(typeof setting.outfits != "undefined") {
-		outfit_collection_setting = settings.outfits;
-	}
-	if(outfit_collection_setting) {
-		PS2Data.Players = new Mongo.Collection(outfit_collection_setting);
-	}
-
-	//--------------------------------------------------------------------------
-
-
-
+	//Possible customization here
 
 	MONGO_INITIALIZED = true; //Prevent rerunning;
 }
