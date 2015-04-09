@@ -21,7 +21,7 @@ function buildUrl(collection,id,query,version,format) {
 		"/get/ps2:"+version +
 		"/"+collection +
 		(id?"/"+id:"") +
-		"/" + query;
+		"/" + (query?query:"");
 }
 
 playerHandler = {};
@@ -60,11 +60,18 @@ playerHandler.inserter = function(array) {
 
 outfitHandler = {};
 outfitHandler.parser = function(array) {
-
+	return array; //TODO insert updated date
 };
 
 outfitHandler.inserter = function(array) {
-
+	if(PS2Data.Outfits) {
+		for(var i=0;i<array.length;i++) {
+			var outfit = array[i];
+			PS2Data.Outfits.upsert(outfit.outfit_id,{
+				$set : outfit
+			});
+		}
+	}
 };
 
 //37509488620601506 conz id
@@ -127,7 +134,7 @@ function mongoInitDefault(){
 	}
 	if(Mongo) {
 		PS2Data.Players = new Mongo.Collection("planetside2data_players");
-		PS2Data.Oufits = new Mongo.Collection("planetside2data_outfits");
+		PS2Data.Outfits = new Mongo.Collection("planetside2data_outfits");
 	}
 
 	MONGO_INITIALIZED = true;
@@ -142,7 +149,7 @@ function mongoInitCustom(setting) {
 
 	//Possible customization here, maybe, for now just do the same as default
 	PS2Data.Players = new Mongo.Collection("planetside2data_players");
-	PS2Data.Oufits = new Mongo.Collection("planetside2data_outfits");
+	PS2Data.Outfits = new Mongo.Collection("planetside2data_outfits");
 
 	MONGO_INITIALIZED = true; //Prevent rerunning;
 }
@@ -156,9 +163,15 @@ PS2Data.fetchSinglePlayer = function(id,callback) {
 //http://census.daybreakgames.com/get/ps2:v2/outfit_member/?outfit_id=37509488620601506&c:join=type:character^on:character_id^to:character_id^list:1^inject_at:cd&c:limit=500
 //http://census.daybreakgames.com/get/ps2:v2/outfit_member/?outfit_id=37509488620601506&c:join=type:character^on:character_id^to:character_id^list:1^inject_at:full_data&c:limit="+DATA_LIMIT
 //Fetches all players from an outfit, takes ID
-PS2Data.fetchOutfitPlayers = function(outfitId,callback,fetchOutFit) {
+PS2Data.fetchOutfitPlayers = function(outfitId,callback,fetchOutfit) {
 	var url = buildUrl("outfit_member",null,"?outfit_id="+outfitId+"&c:join=type:character^on:character_id^to:character_id^list:1^inject_at:joined_data&c:limit="+DATA_LIMIT); //Appending data limit, required for API to function
 	HTTP.get(url,{},bindCallback(callback,playerHandler,{data_key:"outfit_member_list",isList:true}));
+
+	if(typeof fetchOutfit === "undefined" || fetchOutfit) { //If fetchoutfit is undefined or true, get outfit as well
+		url = buildUrl("outfit",outfitId);
+		HTTP.get(url,{},bindCallback(callback,outfitHandler,{data_key:"outfit_list"}));
+	}
+
 };
 
 //Basic configuration function
